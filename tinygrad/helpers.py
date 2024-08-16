@@ -339,7 +339,7 @@ class trange(tqdm):
 
 # *** smaller tqdm -------------------------------------------------------------------------------------------------------------------------
 
-class tqdm:
+class tinytqdm:
   def __init__(self, iterable=None, desc:str='', disable:bool=False, unit:str='it', unit_scale=False, total:Optional[int]=None, rate:int=100):
     self.iter = iterable
     self.desc = f"{desc}: " if desc else ""
@@ -371,7 +371,7 @@ class tqdm:
     if self.dis or (not close and self.i % self.skip != 0): 
       return
 
-    prog, ncols = self.n/self.t if self.t else 0
+    prog = self.n/self.t if self.t else 0
     dur = time.perf_counter()-self.st
     ncols = shutil.get_terminal_size().columns
 
@@ -405,7 +405,7 @@ class tqdm:
 
     print(bar[:ncols+1],flush=True,end='\n'*close,file=sys.stderr)
 
-class trange(tqdm):
+class tinytrange(tinytqdm):
   def __init__(self, n:int, **kwargs): 
     super().__init__(iterable=range(n), total=n, **kwargs)
 
