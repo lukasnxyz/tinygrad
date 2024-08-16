@@ -337,6 +337,80 @@ class tqdm:
 class trange(tqdm):
   def __init__(self, n:int, **kwargs): super().__init__(iterable=range(n), total=n, **kwargs)
 
+# *** smaller tqdm -------------------------------------------------------------------------------------------------------------------------
+
+class tqdm:
+  def __init__(self, iterable=None, desc:str='', disable:bool=False, unit:str='it', unit_scale=False, total:Optional[int]=None, rate:int=100):
+    self.iter = iterable
+    self.desc = f"{desc}: " if desc else ""
+    self.dis = disable
+    self.unit = unit
+    self.unit_scale = unit_scale
+    self.rate = rate
+
+    self.st = time.perf_counter()
+    self.i = -1
+    self.n = 0
+    self.skip = 1
+    self.t = getattr(iterable, "__len__", lambda:0)() if total is None else total
+    self.update(0)
+
+  def __iter__(self):
+    for item in self.iter:
+      yield item
+      self.update(1)
+    self.update(close=True)
+
+  def set_description(self, desc:str): 
+    self.desc = f"{desc}: " if desc else ""
+
+  def update(self, n:int=0, close:bool=False):
+    self.n = self.n+n
+    self.i = self.i+1
+
+    if self.dis or (not close and self.i % self.skip != 0): 
+      return
+
+    prog, ncols = self.n/self.t if self.t else 0
+    dur = time.perf_counter()-self.st
+    ncols = shutil.get_terminal_size().columns
+
+    if self.i/dur > self.rate and self.i: 
+      self.skip = max(int(self.i/dur)//self.rate,1)
+
+    def fmt(t): 
+      return ':'.join(f'{x:02d}' if i else str(x) for i,x in enumerate([int(t)//3600,int(t)%3600//60,int(t)%60]) if i or x)
+
+    def fn(x): 
+      return (f"{x/1000**int(g:=math.log(x,1000)):.{int(3-3*math.fmod(g,1))}f}"[:4].rstrip('.')+' kMGTPEZY'[int(g)].strip()) if x else '0.00'
+
+    if self.unit_scale:
+      unit_text = f'{fn(self.n)}{f"/{fn(self.t)}" if self.t else self.unit}' 
+    else:
+      unit_text = f'{self.n}{f"/{self.t}" if self.t else self.unit}'
+    
+    if self.n:
+      it_text = fn(self.n/dur) if self.unit_scale else f"{self.n/dur:5.2f}"
+    else:
+      it_text = "?"
+    
+    if self.t:
+      tm = f'{fmt(dur)}<{fmt(dur/prog-dur) if self.n else "?"}' 
+    else:
+      tm = fmt(dur)
+
+    suf = f'{unit_text} [{tm}, {it_text}{self.unit}/s]'
+    sz = max(ncols-len(self.desc)-5-2-len(suf), 1)
+    bar = '\r' + self.desc + (f'{100*prog:3.0f}%|{("█"*int(num:=sz*prog)+" ▏▎▍▌▋▊▉"[int(8*num)%8].strip()).ljust(sz," ")}| ' if self.t else '') + suf
+
+    print(bar[:ncols+1],flush=True,end='\n'*close,file=sys.stderr)
+
+class trange(tqdm):
+  def __init__(self, n:int, **kwargs): 
+    super().__init__(iterable=range(n), total=n, **kwargs)
+
+# *** --------------------------------------------------------------------------------------------------------------------------------------
+
 def pretty_print(x:Any, rep:Callable, srcfn=lambda x: x.src, cache=None, d=0)->str:
   def dfs(x:Any, cache:dict):
     for s in srcfn(x) or []:
